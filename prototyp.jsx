@@ -721,6 +721,54 @@ function Sheet({ index, progress, totalSheets, curlIntensity, frontFace, backCon
   );
 }
 
+// ───── MOBILE SINGLE-PAGE READER ──────────────────────────────────
+// On narrow screens the two-page spread is unreadable (each page would be
+// ~150px wide). Instead we show ONE page at a time, near full-width, and
+// turn pages with a 3D leaf-flip driven by the same scroll progress.
+// Desktop is untouched — this component is only rendered when isNarrow.
+function MobileBook({ progress, pages, viewport }) {
+  const RATIO = 680 / 490; // reference page aspect (h/w)
+  const availW = viewport.w - 28;          // 14px side margins
+  const availH = viewport.h - 150;         // room for nav + footer + rail
+  let pageW = Math.min(availW, availH / RATIO);
+  pageW = Math.max(pageW, 240);
+  const pageH = pageW * RATIO;
+  const scale = pageH / 680;
+
+  const N = pages.length;
+  const fpos = clamp((progress / FLIP_COUNT) * (N - 1), 0, N - 1);
+  const cur = clamp(Math.floor(fpos), 0, N - 2);
+  const frac = clamp(fpos - cur, 0, 1);
+  const eased = easeInOut(frac);
+  const turn = -172 * eased;               // current page lifts & turns away left
+
+  // Two layers: the next page rests beneath; the current page turns on top.
+  const layers = [
+    { idx: cur + 1, rot: 0,    z: 1, turning: false },
+    { idx: cur,     rot: turn, z: 2, turning: true },
+  ];
+
+  return (
+    <div className="mobile-book" style={{ width: `${pageW}px`, height: `${pageH}px` }}>
+      <div className="mb-stack" style={{ width: `${pageW}px`, height: `${pageH}px` }}>
+        {layers.map((L) => (
+          <div key={L.turning ? 'top' : 'bottom'} className="mb-page"
+            style={{
+              width: `${pageW}px`, height: `${pageH}px`,
+              '--page-scale': scale,
+              transform: `rotateY(${L.rot}deg)`,
+              zIndex: L.z,
+            }}>
+            {pages[L.idx]}
+            {L.turning && frac > 0.002 &&
+              <div className="mb-turn-shade" style={{ opacity: Math.sin(eased * Math.PI) * 0.5 }} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ───── APP ────────────────────────────────────────────────────────
 function App() {
   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -800,6 +848,11 @@ function App() {
     { front: <KontaktBody key="kontakt-b" />,     back: <BackCoverContent key="back-cover" />, backIsCover: true },
   ];
 
+  // Reading-order flattening for the mobile single-page reader:
+  // [Cover, Präambel-Titel, Präambel-Text, Vita-Titel, … Kontakt-Text, Rückseite]
+  const mobilePages = [];
+  sheetContents.forEach((sc) => { mobilePages.push(sc.front); mobilePages.push(sc.back); });
+
   // ─── Layout math ───
   // Book geometry is responsive: bookH clamps to viewport height so the
   // book always fits with room for the nav (~75px) and bottom hint (~50px).
@@ -821,6 +874,7 @@ function App() {
   // viewport, leaving the left half clear for the intro plate.
   // Cover center horizontally = bookCenter + pageW/2 (since spine = bookCenter).
   const isWide = viewport.w > 940;
+  const isNarrow = viewport.w <= 760;   // mobile single-page reading mode
   const closedCoverCenter = viewport.w * (isWide ? 0.68 : 0.58);
   const closedBookCenter = closedCoverCenter - pageW / 2;
   const openBookCenter = viewport.w / 2;
@@ -870,6 +924,9 @@ function App() {
 
         {showIntro && <IntroPlate visibility={introVisibility} x={introX} width={introWidth} />}
 
+        {isNarrow ? (
+          <MobileBook progress={progress} pages={mobilePages} viewport={viewport} />
+        ) : (
         <div className="book-wrap"
           style={{
             transform: `translate(${bookOffsetFromCenter}px, 0)`,
@@ -893,6 +950,7 @@ function App() {
             <div className="spine-shadow" />
           </div>
         </div>
+        )}
 
         <ProgressRail progress={progress} jumpTo={jumpTo} visible={t.showProgress} />
 

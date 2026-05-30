@@ -620,6 +620,75 @@
     }
     .progress button:hover .tip { opacity: 1; }
 
+    /* ════════ MOBILE SINGLE-PAGE READING MODE (≤760px) ════════
+     * The desktop two-page spread is unreadable on a phone, so on narrow
+     * screens we render ONE page at a time at near-full width via the
+     * <MobileBook> component. Desktop styling above is untouched. */
+    .mobile-book {
+      position: absolute; left: 50%; top: calc(50% - 4px);
+      transform: translate(-50%, -50%);
+      perspective: 1700px;
+      z-index: 10;
+    }
+    .mb-stack { position: relative; transform-style: preserve-3d; }
+    .mb-page {
+      position: absolute; left: 0; top: 0;
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+      background: var(--paper);
+      overflow: hidden;
+      box-shadow:
+        0 26px 64px -22px rgba(40,28,12,0.50),
+        0 6px 18px rgba(0,0,0,0.14);
+      will-change: transform;
+    }
+    /* The face fills the single page; neutralise the spread's back-face flip. */
+    .mobile-book .face { position: absolute; inset: 0; }
+    .mobile-book .face.back { transform: none; }
+    /* Symmetric gutter padding (no spine on a single page). */
+    .mobile-book .pg-left  { padding-right: 64px; }
+    .mobile-book .pg-right { padding-left: 64px; }
+    .mb-turn-shade {
+      position: absolute; inset: 0; pointer-events: none; z-index: 5;
+      background: linear-gradient(90deg,
+        rgba(40,25,10,0.55) 0%, rgba(40,25,10,0.12) 36%, transparent 62%);
+    }
+
+    @media (max-width: 760px) {
+      /* Declutter: stage ornaments crowd the larger single page. */
+      .stage-ornament, .stage-corner, .stage-spine-mark { display: none !important; }
+
+      /* Top bar: keep the CTA on one line, tighten spacing. */
+      .topbar { padding: 12px 16px; gap: 12px; }
+      .topbar-brand { font-size: 16px; }
+      .topbar-cta {
+        white-space: nowrap; padding: 9px 12px;
+        font-size: 9px; letter-spacing: 0.16em; gap: 7px;
+      }
+
+      /* Progress rail → horizontal scrubber pinned above the footer. */
+      .progress {
+        right: auto; left: 50%; top: auto; bottom: 50px;
+        transform: translateX(-50%);
+        flex-direction: row; align-items: flex-end; gap: 11px;
+      }
+      .progress button { padding: 0 2px; justify-content: center; }
+      .progress .pip { width: 1px; height: 13px; }
+      .progress button:hover .pip { width: 1px; height: 18px; }
+      .progress button.active .pip { width: 1.5px; height: 21px; }
+      .progress .tip { display: none; }
+    }
+
+    @media (max-width: 600px) {
+      /* Footer: drop the secondary group so the address never overflows. */
+      .footer-strip { grid-template-columns: 1fr; justify-items: center; padding: 8px 14px; gap: 0; }
+      .footer-strip .fs-right { display: none; }
+      .footer-strip .fs-left { gap: 14px; font-size: 9px; }
+      .footer-strip .fs-left .fs-item .val { font-size: 9px; }
+      .footer-strip .fs-left .fs-item .lbl { font-size: 8px; }
+    }
+
     /* ───── Scroll hint (bottom) ───── */
     .scroll-hint {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
