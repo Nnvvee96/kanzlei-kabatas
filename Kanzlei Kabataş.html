@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kanzlei Kabataş · Konzept · Drei Aufschläge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #efeae0; }
+
+    /* ─── Variant I · Audiatur — Pergament, Bordeaux, Messing ─── */
+    .theme-audiatur {
+      --paper: #f0e6d1;
+      --paper-deep: #e6d9bd;
+      --ink: #221a14;
+      --ink-soft: rgba(34,26,20,0.55);
+      --rule: rgba(34,26,20,0.18);
+      --accent: #6f1d2d;
+      --accent-soft: rgba(111,29,45,0.12);
+      --grain-dot: rgba(60,40,20,0.5);
+      --grain-strength: 0.45;
+      /* book cover */
+      --cover-w: 460px; --cover-h: 620px;
+      --cover-hi: #7a2333;
+      --cover-mid: #5c1622;
+      --cover-lo: #3c0d18;
+      --cover-fg: #f0e6d1;
+      --cover-fg-soft: rgba(240,230,209,0.7);
+      --cover-trim: #c2a25a;
+      --page-edge-light: #ede1c0;
+      --page-edge-dark: #c8b285;
+      --photo-stripe-a: rgba(34,26,20,0.06);
+      --photo-stripe-b: rgba(34,26,20,0.02);
+    }
+
+    /* ─── Variant II · Verbum — Bruchweiß, Mitternachtsblau, Gold ─── */
+    .theme-verbum {
+      --paper: #f4f2ec;
+      --paper-deep: #ebe7dd;
+      --ink: #0d1626;
+      --ink-soft: rgba(13,22,38,0.55);
+      --rule: rgba(13,22,38,0.16);
+      --accent: #b48a3e;
+      --accent-soft: rgba(180,138,62,0.14);
+      --grain-dot: rgba(13,22,38,0.35);
+      --grain-strength: 0.22;
+      --cover-w: 460px; --cover-h: 620px;
+      --cover-hi: #1a2a44;
+      --cover-mid: #0f1c30;
+      --cover-lo: #060d1c;
+      --cover-fg: #f4f2ec;
+      --cover-fg-soft: rgba(244,242,236,0.7);
+      --cover-trim: #b48a3e;
+      --page-edge-light: #f1ede0;
+      --page-edge-dark: #cdc6b3;
+      --photo-stripe-a: rgba(13,22,38,0.06);
+      --photo-stripe-b: rgba(13,22,38,0.015);
+    }
+
+    /* ─── Variant III · Veritas — Streng Monochrom ─── */
+    .theme-veritas {
+      --paper: #f3efe7;
+      --paper-deep: #eae6dc;
+      --ink: #0c0c0a;
+      --ink-soft: rgba(12,12,10,0.55);
+      --rule: rgba(12,12,10,0.20);
+      --accent: #0c0c0a;
+      --accent-soft: rgba(12,12,10,0.08);
+      --grain-dot: rgba(12,12,10,0.40);
+      --grain-strength: 0.30;
+      --cover-w: 460px; --cover-h: 620px;
+      --cover-hi: #1c1c19;
+      --cover-mid: #0d0d0b;
+      --cover-lo: #050504;
+      --cover-fg: #f3efe7;
+      --cover-fg-soft: rgba(243,239,231,0.6);
+      --cover-trim: rgba(243,239,231,0.45);
+      --page-edge-light: #ece8de;
+      --page-edge-dark: #c8c3b6;
+      --photo-stripe-a: rgba(12,12,10,0.06);
+      --photo-stripe-b: rgba(12,12,10,0.02);
+    }
+
+    /* In Veritas, the dropcap should match ink, not be a separate accent. */
+    .theme-veritas .kb-dropcap::first-letter,
+    .theme-veritas .kb-chapter-numeral { color: var(--ink); }
+    .theme-veritas .kb-chapter-title em { color: var(--ink); text-decoration-line: underline;
+      text-decoration-style: solid; text-decoration-thickness: 1px; text-underline-offset: 8px; }
+    .theme-veritas .kb-leitsatz-h em { color: var(--ink); font-style: italic;
+      text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 10px; }
+    .theme-veritas .kb-nav-links .kb-active::after { background: var(--ink); }
+    .theme-veritas .kb-nav-cta .kb-dot { background: var(--ink); }
+    .theme-veritas .kb-cal-mode-row.active .kb-dot { background: var(--ink); border-color: var(--ink); }
+    .theme-veritas .kb-pull { border-left-color: var(--ink); }
+    .theme-veritas .kb-marg-rule { background: var(--ink); }
+
+    /* Canvas chrome heading */
+    .stage-intro {
+      max-width: 900px; padding: 56px 56px 0; margin: 0 auto;
+      font-family: 'Manrope', sans-serif;
+    }
+    .stage-eyebrow {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.26em; text-transform: uppercase; color: rgba(60,50,40,0.7);
+    }
+    .stage-h {
+      font-family: 'Cormorant Garamond', serif; font-weight: 400;
+      font-size: 56px; line-height: 1.02; margin: 16px 0 14px; color: #2a221b;
+      letter-spacing: -0.01em;
+    }
+    .stage-h em { font-style: italic; color: #6f1d2d; }
+    .stage-lede {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 22px; line-height: 1.45; color: rgba(60,50,40,0.85);
+      max-width: 60ch; margin: 0 0 18px;
+    }
+    .stage-meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.06em; line-height: 1.7; color: rgba(60,50,40,0.65);
+      margin-bottom: 14px;
+    }
+    .stage-meta a { color: #6f1d2d; text-decoration: none; border-bottom: 1px solid currentColor; }
+    .stage-meta a:hover { opacity: 0.7; }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="book.jsx"></script>
+  <script type="text/babel">
+    const { DesignCanvas, DCSection, DCArtboard, DCPostIt } = window;
+    const { VariantBoard, ClosedCover } = window;
+
+    function App() {
+      return (
+        <div data-screen-label="Canvas · Drei Aufschläge">
+          <div className="stage-intro">
+            <div className="stage-eyebrow">Konzept · drei Aufschläge zur Wahl</div>
+            <h1 className="stage-h">
+              Kanzlei <em>Kabataş.</em> Die Webseite als Juristenbuch.
+            </h1>
+            <p className="stage-lede">
+              Drei ästhetische Richtungen — gleiches Gerüst, gleiche Kapitel,
+              gleiche Buch-Metapher. Pan/Zoom auf der Fläche, einzelne Variante
+              im Fokus öffnen, oder direkt in den interaktiven Prototypen mit
+              echter <em>Page-Curl-Animation</em>.
+            </p>
+            <div className="stage-meta">
+              ▸ <a href="Kanzlei Kabataş - Prototyp.html">Interaktiver Prototyp · 3D-Page-Curl beim Scrollen →</a><br/>
+              ▸ Jedes Artboard ist ein vollständiger Aufschlag aus dem Buch.
+              Klicke „↗" oben rechts an einer Karte, um sie im Fokus zu öffnen.
+            </div>
+          </div>
+
+          <DesignCanvas initialZoom={0.42}>
+            <DCSection
+              id="cover"
+              title="Aufschlag 0 · Der Einband"
+              subtitle="Die Kanzlei als gebundenes Buch — drei Lederfarben zur Wahl."
+            >
+              <DCArtboard id="cover-aud" label="I · Audiatur" width={760} height={900}>
+                <div className="theme-audiatur" style={{ width:'100%', height:'100%' }}>
+                  <div className="kb-root">
+                    <div className="kb-grain" />
+                    <ClosedCover title="Rechtsanwalt · LL.M." motto="Audiatur et altera pars" />
+                  </div>
+                </div>
+              </DCArtboard>
+              <DCArtboard id="cover-ver" label="II · Verbum" width={760} height={900}>
+                <div className="theme-verbum" style={{ width:'100%', height:'100%' }}>
+                  <div className="kb-root">
+                    <div className="kb-grain" />
+                    <ClosedCover title="Rechtsanwalt · LL.M." motto="Verbum tenere — das Wort halten." />
+                  </div>
+                </div>
+              </DCArtboard>
+              <DCArtboard id="cover-vrt" label="III · Veritas" width={760} height={900}>
+                <div className="theme-veritas" style={{ width:'100%', height:'100%' }}>
+                  <div className="kb-root">
+                    <div className="kb-grain" />
+                    <ClosedCover title="Rechtsanwalt · LL.M." motto="Veritas iudex sui." />
+                  </div>
+                </div>
+              </DCArtboard>
+              <DCPostIt x={2360} y={120} w={260}>
+                Klick eine Karte fullscreen → die Buch-Vorderseite mit Foilstamping.
+                Die Materialität (Bordeaux-Leder / Marineblau / Anthrazit) prägt
+                den Rest der Seite.
+              </DCPostIt>
+            </DCSection>
+
+            <DCSection
+              id="vollseite"
+              title="Aufschlag I — VI · Die ganze Webseite"
+              subtitle="Scrollbarer Aufriss: Nav · Leitsatz · Präambel · Inhalt · Vita · Rechtsgebiete · Mandatsanfrage."
+            >
+              <DCArtboard id="full-aud" label="I · Audiatur — die warme Kanzlei" width={1280} height={3100}>
+                <VariantBoard themeClass="theme-audiatur" motto="Audiatur et altera pars — der Mensch zuerst." />
+              </DCArtboard>
+              <DCArtboard id="full-ver" label="II · Verbum — tech-forward" width={1280} height={3100}>
+                <VariantBoard themeClass="theme-verbum" motto="Verbum tenere — das Wort halten." />
+              </DCArtboard>
+              <DCArtboard id="full-vrt" label="III · Veritas — streng monochrom" width={1280} height={3100}>
+                <VariantBoard themeClass="theme-veritas" motto="Veritas iudex sui — die Wahrheit ist ihr Richter." />
+              </DCArtboard>
+              <DCPostIt x={3940} y={420} w={280}>
+                Diese drei sind <em>nicht</em> drei verschiedene Seitenstrukturen —
+                es ist die gleiche Webseite in drei Materialitäten. Nimm eine,
+                tweake im Prototypen weiter.
+              </DCPostIt>
+            </DCSection>
+          </DesignCanvas>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

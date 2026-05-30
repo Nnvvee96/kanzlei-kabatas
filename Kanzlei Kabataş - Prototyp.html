@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kanzlei Kabataş · Prototyp · Das Juristenbuch</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Manrope:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    html, body { margin: 0; padding: 0; background: #d8d1bd; overscroll-behavior: none; }
+    body { font-family: 'Manrope', system-ui, sans-serif; color: var(--ink); }
+
+    /* Tall scroll surface — 7 sheets × viewport height makes the scrubber 0…6 */
+    #scroll-driver { height: 700vh; position: relative; }
+
+    /* The sticky stage that holds the book and never scrolls itself */
+    .stage {
+      position: sticky; top: 0; width: 100%; height: 100vh;
+      overflow: hidden;
+      background: var(--stage-bg);
+      perspective: 2400px; perspective-origin: 50% 45%;
+      transition: background 0.6s ease;
+    }
+    /* Subtle desk grain on the stage */
+    .stage::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.18), transparent 55%),
+        radial-gradient(ellipse at 70% 80%, rgba(0,0,0,0.10), transparent 55%);
+      mix-blend-mode: overlay;
+    }
+    .stage::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        radial-gradient(circle at 13% 27%, var(--grain), transparent 1.5px),
+        radial-gradient(circle at 67% 41%, var(--grain), transparent 1.5px),
+        radial-gradient(circle at 84% 78%, var(--grain), transparent 1.5px),
+        radial-gradient(circle at 23% 89%, var(--grain), transparent 1.5px);
+      background-size: 240px 240px, 200px 200px, 270px 270px, 220px 220px;
+      opacity: 0.35;
+    }
+
+    /* Theme variables — bright, warm, library-desk feel */
+    .stage[data-theme="audiatur"] {
+      --stage-bg: #d6c4a4;
+      --grain: rgba(80,50,20,0.35);
+      --paper: #f4ead4;
+      --paper-edge: #d6c498;
+      --paper-deep: #ecdfba;
+      --ink: #2a1c14;
+      --ink-soft: rgba(42,28,20,0.55);
+      --rule: rgba(42,28,20,0.20);
+      --accent: #6f1d2d;
+      --accent-soft: rgba(111,29,45,0.10);
+      --cover-hi: #7a2333; --cover-mid: #5c1622; --cover-lo: #3a0d18;
+      --cover-fg: #f0e6d1; --cover-fg-soft: rgba(240,230,209,0.70);
+      --cover-trim: #c8a55c;
+    }
+    .stage[data-theme="verbum"] {
+      --stage-bg: #d8d1bd;
+      --grain: rgba(30,40,60,0.30);
+      --paper: #f6f1e2;
+      --paper-edge: #d6cda8;
+      --paper-deep: #ece5cf;
+      --ink: #0d1626;
+      --ink-soft: rgba(13,22,38,0.55);
+      --rule: rgba(13,22,38,0.18);
+      --accent: #b48a3e;
+      --accent-soft: rgba(180,138,62,0.12);
+      --cover-hi: #1a2a44; --cover-mid: #0f1c30; --cover-lo: #060d1c;
+      --cover-fg: #f6f1e2; --cover-fg-soft: rgba(246,241,226,0.72);
+      --cover-trim: #b48a3e;
+    }
+    .stage[data-theme="veritas"] {
+      --stage-bg: #d2cdbb;
+      --grain: rgba(20,20,15,0.35);
+      --paper: #f5f0e3;
+      --paper-edge: #d8d1ba;
+      --paper-deep: #ebe5d3;
+      --ink: #0c0c0a;
+      --ink-soft: rgba(12,12,10,0.55);
+      --rule: rgba(12,12,10,0.22);
+      --accent: #0c0c0a;
+      --accent-soft: rgba(12,12,10,0.08);
+      --cover-hi: #1c1c19; --cover-mid: #0d0d0b; --cover-lo: #050504;
+      --cover-fg: #f5f0e3; --cover-fg-soft: rgba(245,240,227,0.65);
+      --cover-trim: rgba(245,240,227,0.55);
+    }
+    /* In Veritas, dropcap & numerals stay ink. Accents become underlines. */
+    .stage[data-theme="veritas"] .pg-numeral,
+    .stage[data-theme="veritas"] .pg-dropcap::first-letter { color: var(--ink); }
+    .stage[data-theme="veritas"] .pg-title em,
+    .stage[data-theme="veritas"] .intro-h em {
+      color: var(--ink); font-style: italic;
+      text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 8px;
+    }
+    .stage[data-theme="veritas"] .pg-pull { border-left-color: var(--ink); }
+
+    /* ───── The book ───── */
+    .book-wrap {
+      position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+    .book {
+      position: absolute; top: 0; left: 0;
+      width: var(--book-w); height: var(--book-h);
+      transform: translate(-50%, -50%);
+      transform-style: preserve-3d;
+    }
+
+    /* Each page rotates around the spine (left edge of the right half) */
+    .page {
+      position: absolute; top: 0; left: 50%;
+      width: 50%; height: 100%;
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+    .face {
+      position: absolute; inset: 0;
+      backface-visibility: hidden;
+      transform-style: preserve-3d;
+      background: var(--paper);
+      box-shadow:
+        inset 0 0 40px rgba(60,40,20,0.06),
+        inset 0 0 8px rgba(0,0,0,0.03);
+      color: var(--ink);
+      overflow: hidden;
+    }
+    .face.back {
+      transform: rotateY(180deg);
+      transform-style: preserve-3d;
+    }
+
+    /* Static left-page layer — the back content (chapter title) rendered
+     * statically at the left page area. Fades in via opacity as a sheet
+     * flips; sits underneath the rotating .page during the flip. Once a
+     * sheet is fully flipped its static-back is fully opaque; later sheets'
+     * static-backs stack ON TOP (higher z-index = latest flipped). */
+    .static-back-page {
+      position: absolute; top: 0; left: 0;
+      width: 50%; height: 100%;
+      background: var(--paper);
+      box-shadow:
+        inset 0 0 40px rgba(60,40,20,0.06),
+        inset 0 0 8px rgba(0,0,0,0.03),
+        inset -8px 0 24px rgba(40,30,15,0.10);
+      overflow: hidden;
+      will-change: opacity;
+      pointer-events: none;
+    }
+
+    /* ===== The scaler ====================================================
+     * Every page's content is designed at a fixed reference size
+     * (REF_PAGE_W × REF_PAGE_H ≡ 490 × 680). On any viewport we render the
+     * .face at the actual responsive size and use a child .scaler positioned
+     * absolute at the reference size, with transform: scale(--page-scale) to
+     * shrink it down. Result: content always fits its page — no overflow,
+     * font sizes/padding stay in proportion, no media-query gymnastics.
+     * backface-visibility on the scaler too so the contents are hidden when
+     * the parent face is rotated away (some browsers don't propagate that
+     * through overflow:hidden + child transform reliably). */
+    .scaler {
+      position: absolute; top: 0; left: 0;
+      width: 490px; height: 680px;
+      transform: scale(var(--page-scale, 1));
+      transform-origin: top left;
+      backface-visibility: hidden;
+    }
+    .scaler.cover-scaler {
+      display: flex; flex-direction: column;
+      padding: 50px 36px;
+      box-sizing: border-box;
+    }
+    /* When the book is closed, hide the left-stack so the "book on the desk"
+       reads as a single closed object, not a thick open volume. */
+    .book[data-closed="true"] .left-stack { display: none; }
+
+    /* Static back-page in cover mode (sheet 6: back cover). Paints the
+     * navy gradient instead of paper so the closing-the-book state still
+     * reads as a leather-bound object. */
+    .static-back-page.is-cover {
+      background:
+        linear-gradient(135deg, var(--cover-hi) 0%, var(--cover-mid) 50%, var(--cover-lo) 100%);
+      color: var(--cover-fg);
+      box-shadow:
+        inset 0 0 80px rgba(0,0,0,0.40),
+        inset -8px 0 24px rgba(0,0,0,0.30);
+    }
+
+    /* Blank back face on the rotating sheet — paper-coloured by default,
+     * cover-styled when either side of the sheet is a cover (sheet 0:
+     * inside of cover = navy; sheet 6: back-cover transition = navy). */
+    .face.back.blank-back {
+      background: var(--paper);
+    }
+    .face.back.blank-back.is-cover {
+      background:
+        linear-gradient(135deg, var(--cover-hi) 0%, var(--cover-mid) 50%, var(--cover-lo) 100%);
+      box-shadow: inset 0 0 80px rgba(0,0,0,0.40);
+    }
+
+    /* Spine shadow over the gutter */
+    .spine-shadow {
+      position: absolute; top: 0; left: 50%; width: 90px; height: 100%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg,
+        transparent 0%, rgba(0,0,0,0.06) 38%, rgba(0,0,0,0.18) 50%,
+        rgba(0,0,0,0.06) 62%, transparent 100%);
+      pointer-events: none; z-index: 200;
+    }
+    .book[data-closed="true"] .spine-shadow { opacity: 0; }
+
+    /* Page edges (the book's foredge — visible stack of paper sides) */
+    .book::after {
+      content: ''; position: absolute; top: 6px; bottom: 6px; right: -7px;
+      width: 14px;
+      background: repeating-linear-gradient(180deg,
+        var(--paper) 0 1.5px, var(--paper-edge) 1.5px 2.6px);
+      box-shadow: 3px 0 14px rgba(0,0,0,0.30);
+      transform: rotateY(85deg); transform-origin: left center;
+    }
+
+    /* Curl shading on each face: darker at the spine edge as it tilts */
+    .face::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(90deg,
+        rgba(40,25,10,var(--shade-l, 0)) 0%,
+        transparent 12%, transparent 88%,
+        rgba(40,25,10,var(--shade-r, 0)) 100%);
+    }
+
+    /* ───── Page content typography ───── */
+    .pg {
+      position: absolute; inset: 0;
+      padding: 64px 64px 76px;
+      display: flex; flex-direction: column;
+      font-family: 'Manrope', sans-serif;
+    }
+    .pg-left  { padding-right: 80px; }
+    .pg-right { padding-left: 80px; }
+
+    .pg-marg {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .pg-right .pg-marg { text-align: right; }
+
+    .pg-pagenum {
+      position: absolute; bottom: 32px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.18em; color: var(--ink-soft);
+    }
+    .pg-left  .pg-pagenum { left: 64px; }
+    .pg-right .pg-pagenum { right: 80px; }
+
+    /* Chapter title page — left-page treatment */
+    .pg-title-block {
+      flex: 1; display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 0 0 36px;
+    }
+    .pg-numeral {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-weight: 400; font-size: 96px; line-height: 1;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .pg-kicker {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.34em; text-transform: uppercase; color: var(--ink-soft);
+      margin: 22px 0 8px;
+    }
+    .pg-title {
+      font-family: 'Cormorant Garamond', serif; font-weight: 400;
+      font-size: 44px; line-height: 1.04; letter-spacing: -0.005em;
+      margin: 0 0 16px; max-width: 13ch;
+    }
+    .pg-title em { font-style: italic; color: var(--accent); }
+    .pg-lede {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 17px; line-height: 1.42; color: var(--ink-soft);
+      max-width: 26ch; margin: 0;
+    }
+
+    /* Body type */
+    .pg-body {
+      font-size: 13.5px; line-height: 1.78; max-width: 36ch; font-weight: 350;
+      color: var(--ink);
+    }
+    .pg-body p { margin: 0 0 12px; }
+    .pg-body p + p { text-indent: 1.4em; }
+    .pg-dropcap::first-letter {
+      font-family: 'Cormorant Garamond', serif; font-weight: 500;
+      float: left; font-size: 54px; line-height: 0.85; padding: 6px 9px 0 0;
+      color: var(--accent);
+    }
+    .pg-pull {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 19px; line-height: 1.38; color: var(--ink);
+      border-left: 2px solid var(--accent); padding: 4px 0 4px 14px;
+      margin: 16px 0; max-width: 28ch;
+    }
+    .pg-sig {
+      display: flex; align-items: center; gap: 10px; margin-top: auto;
+      padding-top: 16px;
+    }
+    .pg-sig-line { flex: 0 0 36px; height: 1px; background: var(--rule); }
+    .pg-sig-name {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 17px;
+    }
+
+    /* Justitia minimark */
+    .jus { position: relative; color: var(--accent); flex: 0 0 auto; }
+    .jus div { position: absolute; background: currentColor; }
+    .jus .pl  { left: 50%; top: 18%; width: 1.6px; height: 64%; transform: translateX(-50%); }
+    .jus .bm  { left: 12%; right: 12%; top: 22%; height: 1.6px; }
+    .jus .ba  { left: 22%; right: 22%; bottom: 14%; height: 1.6px; }
+    .jus .ft  { left: 36%; right: 36%; bottom: 9%; height: 1.6px; }
+    .jus .pan {
+      position: absolute; top: 24%; width: 22%; height: 14%;
+      border: 1.6px solid currentColor; border-top: none;
+      border-radius: 0 0 100% 100% / 0 0 100% 100%;
+      background: transparent;
+    }
+    .jus .pan.l { left: 7%; } .jus .pan.r { right: 7%; }
+    .jus .pan::before {
+      content: ''; position: absolute; left: 50%; top: -1px; width: 1.6px;
+      height: 5px; background: currentColor; transform: translateX(-50%) translateY(-100%);
+    }
+
+    /* ───── Cover (closed book front) ───── */
+    .cover-face {
+      background: linear-gradient(135deg, var(--cover-hi) 0%, var(--cover-mid) 50%, var(--cover-lo) 100%);
+      color: var(--cover-fg);
+      box-shadow: inset 0 0 80px rgba(0,0,0,0.40);
+    }
+    .cover-face::after { display: none; }
+    .cover-frame {
+      flex: 1; border: 1px solid var(--cover-trim);
+      padding: 38px 22px;
+      display: flex; flex-direction: column; justify-content: space-between; text-align: center;
+    }
+    .cover-eyebrow {
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.42em; text-transform: uppercase; color: var(--cover-fg-soft);
+    }
+    .cover-name {
+      font-family: 'Cormorant Garamond', serif; font-weight: 500;
+      font-size: 54px; line-height: 1; letter-spacing: 0.01em;
+    }
+    .cover-name em { font-style: italic; font-weight: 400; }
+    .cover-role {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 19px; color: var(--cover-fg-soft); margin-top: 12px;
+    }
+    .cover-motto {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 13px; color: var(--cover-fg-soft); letter-spacing: 0.02em;
+    }
+    .cover-edition {
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      letter-spacing: 0.36em; text-transform: uppercase; color: var(--cover-fg-soft);
+    }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      display: grid; grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 32px;
+      padding: 14px 36px;
+      color: var(--ink); font-family: 'Manrope', sans-serif;
+      pointer-events: none;
+      background: var(--stage-bg);
+      border-bottom: 2px solid var(--ink);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    }
+    .topbar > * { pointer-events: auto; }
+    .topbar-brand {
+      display: flex; align-items: baseline; gap: 14px;
+      white-space: nowrap;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; letter-spacing: 0.02em; color: var(--ink);
+    }
+    .topbar-brand em { color: var(--accent); font-style: italic; font-weight: 500; }
+    .topbar-brand .role {
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--ink-soft);
+      padding-left: 14px;
+      border-left: 1px solid var(--rule);
+    }
+    .topbar-links {
+      display: flex; gap: 18px; justify-self: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-soft);
+      white-space: nowrap;
+    }
+    @media (max-width: 1280px) {
+      .topbar-brand .role { display: none; }
+      .topbar-links { font-size: 9px; gap: 14px; letter-spacing: 0.14em; }
+    }
+    @media (max-width: 1040px) {
+      .topbar-links { display: none; }
+    }
+    .topbar-links button {
+      background: transparent; border: none; padding: 0;
+      font: inherit; color: inherit; cursor: pointer; letter-spacing: inherit;
+      transition: color 0.2s;
+    }
+    .topbar-links button:hover { color: var(--ink); }
+    .topbar-links button.active { color: var(--ink); }
+    .topbar-links button.active::before {
+      content: ''; display: inline-block; width: 10px; height: 1px;
+      background: var(--accent); margin-right: 8px; vertical-align: middle;
+    }
+    .topbar-cta {
+      justify-self: end;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      padding: 10px 16px;
+      background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .topbar-cta:hover { background: var(--accent); border-color: var(--accent); }
+    .topbar-cta .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    }
+
+    /* ───── Bottom strip ("Futter" — always visible) ─────
+     * Editorial bar pinned at the bottom — mixed typography (serif italic
+     * motto + a sans-serif metric row) so it reads modern, not typewriter. */
+    .footer-strip {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 45;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 36px;
+      padding: 10px 36px;
+      background: var(--stage-bg);
+      border-top: 2px solid var(--ink);
+      box-shadow: 0 -1px 0 rgba(0,0,0,0.04);
+      color: var(--ink);
+      pointer-events: none;
+    }
+    /* ───── Footer typography: unified ─────
+     * Labels and values both in JetBrains Mono so the strip reads as ONE
+     * row — only weight + letter-spacing differ. The italic Cormorant motto
+     * stays as the central anchor. */
+    .footer-strip .fs-left,
+    .footer-strip .fs-right {
+      display: flex; align-items: center; gap: 22px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; font-weight: 400;
+      letter-spacing: 0.04em;
+      color: var(--ink);
+      pointer-events: auto;
+    }
+    .footer-strip .fs-right { justify-content: flex-end; }
+    .footer-strip .fs-item {
+      display: inline-flex; align-items: baseline; gap: 10px;
+      white-space: nowrap;
+    }
+    .footer-strip .fs-item .lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; font-weight: 500;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+    .footer-strip .fs-item .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; font-weight: 400;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+      font-feature-settings: 'tnum';
+      text-transform: none;
+    }
+    .footer-strip .fs-motto {
+      justify-self: center;
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 18px; line-height: 1; color: var(--accent);
+      letter-spacing: 0.01em; white-space: nowrap;
+      pointer-events: auto;
+    }
+    .footer-strip .fs-motto::before,
+    .footer-strip .fs-motto::after {
+      content: ''; display: inline-block; width: 22px; height: 1px;
+      background: currentColor; vertical-align: middle;
+      margin: 0 14px; opacity: 0.6;
+    }
+    @media (max-width: 1240px) {
+      .footer-strip .fs-hide-md { display: none; }
+    }
+    @media (max-width: 920px) {
+      .footer-strip { padding: 10px 20px; gap: 18px; }
+      .footer-strip .fs-hide-sm { display: none; }
+      .footer-strip .fs-motto::before,
+      .footer-strip .fs-motto::after { display: none; }
+    }
+
+    /* ───── Stage ornaments ─────
+     * Latin maxims as vertical rules on either side of the book; subtle gold
+     * fleurons at the corners. Visible once the intro plate has faded out
+     * (i.e. while reading). All purely typographic — no icons, no SVG. */
+    .stage-ornament {
+      position: absolute;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.46em; text-transform: uppercase;
+      color: var(--accent);
+      white-space: nowrap;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      user-select: none; pointer-events: none;
+      display: flex; align-items: center; gap: 14px;
+      font-weight: 400;
+    }
+    .stage-ornament .orn-rule {
+      display: block; width: 28px; height: 1px; background: currentColor; opacity: 0.6;
+    }
+    .stage-ornament.left {
+      left: 32px; top: 58%;
+      transform: translateY(-50%) rotate(-90deg);
+      transform-origin: left center;
+    }
+    .stage-ornament.right {
+      display: none;
+    }
+    .stage[data-book-open="true"] .stage-ornament { opacity: 0.55; }
+
+    .stage-corner {
+      position: absolute; z-index: 1; opacity: 0;
+      transition: opacity 0.6s ease;
+      font-family: 'Cormorant Garamond', serif;
+      color: var(--accent);
+      pointer-events: none; user-select: none;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stage-corner .fleuron {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 18px; line-height: 1; color: var(--accent);
+    }
+    .stage-corner.top-left  { top: 84px; left: 36px; }
+    .stage-corner.top-right { top: 84px; right: 36px; flex-direction: row-reverse; }
+    .stage-corner.bottom-left { bottom: 60px; left: 36px; }
+    .stage-corner.bottom-right { bottom: 60px; right: 36px; flex-direction: row-reverse; }
+    @media (max-width: 1500px) {
+      .stage-corner.top-right, .stage-corner.bottom-right { display: none; }
+    }
+    @media (max-width: 1400px) {
+      .stage-corner.bottom-left, .stage-corner.bottom-right { display: none; }
+    }
+    .stage[data-book-open="true"] .stage-corner { opacity: 0.5; }
+
+    /* Spine-side decorative tick marks (above + below the book) */
+    .stage-spine-mark {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      width: 32px; height: 1px; background: var(--accent);
+      z-index: 1; opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .stage-spine-mark.top { top: 76px; }
+    .stage-spine-mark.bottom { bottom: 52px; }
+    .stage-spine-mark::before, .stage-spine-mark::after {
+      content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+      width: 4px; height: 4px;
+      border: 1px solid var(--accent); border-radius: 50%;
+    }
+    .stage-spine-mark::before { left: -8px; }
+    .stage-spine-mark::after { right: -8px; }
+    .stage[data-book-open="true"] .stage-spine-mark { opacity: 0.6; }
+
+    /* (Konzept back-link removed per request) */
+
+    /* ───── Progress rail (right side) ─────
+     * Minimal: a column of hairline pips on the right edge. Labels are
+     * tooltips that fly out to the LEFT on hover (so they never overlap the
+     * book). Active pip is wider and accented; inactive pips are subtle. */
+    .progress {
+      position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
+      z-index: 40; display: flex; flex-direction: column; gap: 12px;
+      pointer-events: auto;
+    }
+    .progress button {
+      background: transparent; border: none; cursor: pointer;
+      padding: 6px 0; position: relative;
+      display: flex; align-items: center; justify-content: flex-end;
+      transition: opacity 0.2s;
+    }
+    .progress .pip {
+      width: 18px; height: 1px; background: var(--ink-soft);
+      transition: width 0.3s, background 0.3s, height 0.3s;
+    }
+    .progress button:hover .pip { background: var(--ink); width: 24px; }
+    .progress button.active .pip {
+      width: 32px; height: 1.5px; background: var(--accent);
+    }
+    .progress .tip {
+      position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.20em; text-transform: uppercase;
+      color: var(--ink);
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(6px);
+      padding: 5px 10px;
+      border: 1px solid var(--rule);
+      white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s;
+    }
+    .progress button:hover .tip { opacity: 1; }
+
+    /* ───── Scroll hint (bottom) ───── */
+    .scroll-hint {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      z-index: 40; color: var(--ink-soft);
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.36em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 14px;
+      padding: 8px 18px;
+      background: rgba(255,255,255,0.45);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--rule);
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+    .scroll-hint .arrow {
+      width: 1px; height: 14px;
+      background: linear-gradient(180deg, transparent, var(--ink-soft));
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scaleY(0.5); opacity: 0.45; }
+      50%      { transform: scaleY(1);   opacity: 1; }
+    }
+
+    .intro-plate {
+      position: absolute;
+      top: 110px; bottom: 70px;
+      transform: none;
+      z-index: 30;
+      padding: 0;
+      display: flex; flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 18px;
+      overflow: hidden;
+      will-change: opacity;
+      color: var(--ink);
+    }
+    .intro-meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink-soft);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .intro-meta .ruler { flex: 0 0 28px; height: 1px; background: var(--accent); }
+    .intro-hero {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 5 / 6;
+      flex: 0 1 auto;
+      max-height: 36vh;
+      background:
+        radial-gradient(ellipse at 50% 32%, #1a2a44 0%, var(--cover-mid) 60%, var(--cover-lo) 100%);
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.20), 0 2px 8px rgba(0,0,0,0.10);
+    }
+    .intro-hero-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      display: block;
+    }
+    .intro-hero img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; object-position: center 40%;
+      filter: contrast(1.04) saturate(0.92);
+    }
+    .intro-hero::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(13,22,38,0) 35%, rgba(13,22,38,0.55) 100%),
+        linear-gradient(45deg, rgba(13,22,38,0.18) 0%, transparent 40%);
+    }
+    .intro-hero-caption {
+      position: absolute; left: 20px; bottom: 18px; right: 20px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.32em; text-transform: uppercase;
+      color: rgba(255,255,255,0.92);
+      display: flex; align-items: center; gap: 12px;
+      z-index: 2;
+    }
+    .intro-hero-caption::before {
+      content: ''; display: block; width: 28px; height: 1px;
+      background: var(--cover-trim);
+      flex: 0 0 28px;
+    }
+    .intro-h {
+      font-family: 'Cormorant Garamond', serif; font-weight: 400;
+      font-size: clamp(26px, 2.4vw, 36px); line-height: 1.06; letter-spacing: -0.012em;
+      color: var(--ink); margin: 0;
+    }
+    .intro-h em { font-style: italic; color: var(--accent); }
+    .intro-sub {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: clamp(13px, 1.1vw, 15px); line-height: 1.45; color: var(--ink-soft);
+      max-width: 34ch; margin: 0;
+    }
+    .intro-foot {
+      display: flex; flex-direction: column; gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--rule);
+      font-family: 'Manrope', sans-serif;
+      line-height: 1.4;
+    }
+    .intro-foot .row {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .intro-foot .row-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+    .intro-foot .row-value {
+      font-size: 12px; color: var(--ink);
+      letter-spacing: 0.005em;
+    }
+
+    /* ───── Versprechen / Mandat / Rechtsgebiete layouts ───── */
+    .promise-list, .step-list { display: flex; flex-direction: column; gap: 14px; }
+    .promise, .step {
+      display: grid; grid-template-columns: 32px 1fr; gap: 14px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--rule);
+    }
+    .promise:last-child, .step:last-child { border-bottom: none; padding-bottom: 0; }
+    .promise-n {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.18em; color: var(--ink-soft); padding-top: 5px;
+    }
+    .step-n {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 24px; color: var(--accent); line-height: 1; padding-top: 2px;
+    }
+    .promise-h, .step-h {
+      font-family: 'Cormorant Garamond', serif; font-size: 19px;
+      font-weight: 400; line-height: 1.15; margin: 0 0 4px;
+    }
+    .promise-d, .step-d {
+      font-size: 11.5px; line-height: 1.55; color: var(--ink-soft);
+      font-weight: 350; margin: 0; max-width: 38ch;
+    }
+
+    .rg { display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      border-top: 1px solid var(--rule); margin-top: 14px; }
+    .rg-cell { padding: 14px 14px 16px;
+      border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+    .rg-cell:nth-child(2n) { border-right: none; }
+    .rg-n { font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.30em; color: var(--ink-soft); margin-bottom: 6px; }
+    .rg-t { font-family: 'Cormorant Garamond', serif; font-size: 18px;
+      font-weight: 400; line-height: 1.1; margin-bottom: 4px; }
+    .rg-d { font-size: 11px; line-height: 1.5; color: var(--ink-soft); font-weight: 350; }
+
+    /* Calendly mock */
+    .cal-modes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .cal-mode {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      border: 1px solid var(--rule);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .cal-mode .d { width: 7px; height: 7px; border-radius: 50%;
+      border: 1px solid var(--ink-soft); flex: 0 0 auto; transition: all 0.15s; }
+    .cal-mode:hover { color: var(--ink); border-color: var(--ink-soft); }
+    .cal-mode.active { color: var(--ink); border-color: var(--ink); }
+    .cal-mode.active .d { background: var(--accent); border-color: var(--accent); }
+    .cal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+    .cal-slot {
+      padding: 8px 0; text-align: center; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+      border: 1px solid var(--rule); color: var(--ink); transition: all 0.12s;
+    }
+    .cal-slot.muted { color: var(--ink-soft); cursor: default; opacity: 0.5; }
+    .cal-slot:hover:not(.muted) { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .cal-slot.picked { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .cal-confirm {
+      margin-top: 12px; width: 100%; padding: 11px 14px;
+      background: var(--ink); color: var(--paper); border: none;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background 0.2s;
+    }
+    .cal-confirm:hover { background: var(--accent); }
+
+    /* ───── Rechtsgebiete table v2 ───── */
+    .rg-table { margin-top: 14px; border-top: 1px solid var(--rule); }
+    .rg-head, .rg-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 1.5fr 78px;
+      gap: 10px; align-items: baseline;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .rg-head {
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-soft); padding: 6px 0 8px;
+    }
+    .rg-head > span:first-child { visibility: hidden; }
+    .rg-rn {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--ink-soft); letter-spacing: 0.06em;
+    }
+    .rg-rt {
+      font-family: 'Cormorant Garamond', serif; font-size: 16px;
+      line-height: 1.15;
+    }
+    .rg-rk {
+      font-size: 11px; color: var(--ink-soft); line-height: 1.4;
+    }
+    .rg-rh {
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-soft); text-align: right;
+    }
+
+    /* ───── Calendar v2 (Kontakt page) ─────
+     * Compact bookable calendar: mode pills, month/year nav, day grid,
+     * time slots. Sized to fit the 490×680 design scaler. */
+    .cal-modes-row {
+      display: flex; align-items: center; gap: 6px;
+      margin: 4px 0 10px;
+    }
+    .cal-mode-pill {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      padding: 6px 10px; border: 1px solid var(--rule);
+      background: transparent; color: var(--ink-soft); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cal-mode-pill:hover { color: var(--ink); border-color: var(--ink-soft); }
+    .cal-mode-pill.active {
+      background: var(--ink); color: var(--paper); border-color: var(--ink);
+    }
+    .cal-mode-meta {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 13px; color: var(--ink-soft); margin-left: auto;
+    }
+
+    .cal-head {
+      display: grid; grid-template-columns: 26px 1fr 26px;
+      align-items: center; gap: 10px;
+      padding: 0 0 6px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .cal-nav {
+      width: 26px; height: 26px; border: 1px solid var(--rule);
+      background: transparent; color: var(--ink); cursor: pointer;
+      font-size: 14px; line-height: 1; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .cal-nav:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .cal-head-label { text-align: center; }
+    .cal-month {
+      font-family: 'Cormorant Garamond', serif; font-size: 20px;
+      font-weight: 400; letter-spacing: -0.005em; line-height: 1.1;
+    }
+    .cal-year-row {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 1px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.16em; color: var(--ink-soft);
+    }
+    .cal-yr {
+      background: transparent; border: none; color: var(--ink-soft);
+      cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1;
+      transition: color 0.15s;
+    }
+    .cal-yr:hover { color: var(--ink); }
+
+    .cal-dow {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 2px; margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-soft); text-align: center;
+    }
+    .cal-dow span { padding: 2px 0; }
+    .cal-days {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 2px; margin-bottom: 6px;
+    }
+    .cal-day {
+      aspect-ratio: auto; min-height: 26px; height: 26px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--ink); cursor: pointer; padding: 0;
+      font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s; position: relative;
+    }
+    .cal-day.empty { cursor: default; }
+    .cal-day.weekend { color: var(--ink-soft); }
+    .cal-day.past {
+      color: var(--ink-soft); opacity: 0.35; cursor: not-allowed;
+    }
+    .cal-day.today { font-weight: 600; }
+    .cal-day.today::after {
+      content: ''; position: absolute; bottom: 3px; left: 50%;
+      transform: translateX(-50%); width: 4px; height: 1px;
+      background: var(--accent);
+    }
+    .cal-day:not(.empty):not(.past):hover {
+      background: rgba(0,0,0,0.05);
+      border-color: var(--ink-soft);
+    }
+    .cal-day.sel {
+      background: var(--ink); color: var(--paper); border-color: var(--ink);
+      font-weight: 500;
+    }
+    .cal-day.sel.today::after { background: var(--accent); }
+
+    .cal-selected {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 10px; padding: 6px 0 2px;
+      border-top: 1px solid var(--rule);
+    }
+    .cal-selected-label {
+      font-family: 'Cormorant Garamond', serif; font-size: 15px;
+      font-style: italic;
+    }
+    .cal-selected-meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    /* v2 slot grid override: compact spacing */
+    .cal-modes-row + .cal-head ~ .cal-grid,
+    .cal-grid:has(button) {
+      grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 4px;
+    }
+    .cal-grid button.cal-slot {
+      padding: 5px 0; font-size: 10px; border: 1px solid var(--rule);
+    }
+    .cal-grid button.cal-slot:disabled { cursor: not-allowed; }
+
+    /* Photo placeholder */
+    .photo {
+      position: relative; background:
+        repeating-linear-gradient(135deg,
+          rgba(13,22,38,0.07) 0 4px, rgba(13,22,38,0.02) 4px 8px);
+      border: 1px solid var(--rule);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink-soft);
+    }
+    .photo-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      background: var(--paper); padding: 5px 9px; border: 1px solid var(--rule);
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="footer-host">
+    <div class="footer-strip">
+      <div class="fs-left">
+        <div class="fs-item">
+          <span class="lbl">Kanzlei</span>
+          <span class="val">Bürgermeister-Smidt-Str. 24, Bremerhaven</span>
+        </div>
+        <div class="fs-item fs-hide-md">
+          <span class="lbl">Tel.</span>
+          <span class="val">0221 · 12 34 56–78</span>
+        </div>
+      </div>
+      <div class="fs-motto fs-hide-sm">Audiatur et altera pars</div>
+      <div class="fs-right">
+        <div class="fs-item fs-hide-md">
+          <span class="lbl">Sprechzeit</span>
+          <span class="val">Mo — Fr, 9 — 18 Uhr</span>
+        </div>
+        <div class="fs-item">
+          <span class="lbl">Erstsichtung</span>
+          <span class="val">kostenfrei · 24 h</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="tweaks-host"></div>
+
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="prototyp.jsx"></script>
+</body>
+</html>
