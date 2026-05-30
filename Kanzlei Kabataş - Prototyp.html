@@ -44,7 +44,8 @@
     }
 
     /* Theme variables — bright, warm, library-desk feel */
-    .stage[data-theme="audiatur"] {
+    .stage[data-theme="audiatur"],
+    .m-stage[data-theme="audiatur"] {
       --stage-bg: #d6c4a4;
       --grain: rgba(80,50,20,0.35);
       --paper: #f4ead4;
@@ -59,7 +60,8 @@
       --cover-fg: #f0e6d1; --cover-fg-soft: rgba(240,230,209,0.70);
       --cover-trim: #c8a55c;
     }
-    .stage[data-theme="verbum"] {
+    .stage[data-theme="verbum"],
+    .m-stage[data-theme="verbum"] {
       --stage-bg: #d8d1bd;
       --grain: rgba(30,40,60,0.30);
       --paper: #f6f1e2;
@@ -74,7 +76,8 @@
       --cover-fg: #f6f1e2; --cover-fg-soft: rgba(246,241,226,0.72);
       --cover-trim: #b48a3e;
     }
-    .stage[data-theme="veritas"] {
+    .stage[data-theme="veritas"],
+    .m-stage[data-theme="veritas"] {
       --stage-bg: #d2cdbb;
       --grain: rgba(20,20,15,0.35);
       --paper: #f5f0e3;
@@ -91,13 +94,18 @@
     }
     /* In Veritas, dropcap & numerals stay ink. Accents become underlines. */
     .stage[data-theme="veritas"] .pg-numeral,
-    .stage[data-theme="veritas"] .pg-dropcap::first-letter { color: var(--ink); }
+    .m-stage[data-theme="veritas"] .pg-numeral,
+    .stage[data-theme="veritas"] .pg-dropcap::first-letter,
+    .m-stage[data-theme="veritas"] .pg-dropcap::first-letter { color: var(--ink); }
     .stage[data-theme="veritas"] .pg-title em,
-    .stage[data-theme="veritas"] .intro-h em {
+    .m-stage[data-theme="veritas"] .pg-title em,
+    .stage[data-theme="veritas"] .intro-h em,
+    .m-stage[data-theme="veritas"] .intro-h em {
       color: var(--ink); font-style: italic;
       text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 8px;
     }
-    .stage[data-theme="veritas"] .pg-pull { border-left-color: var(--ink); }
+    .stage[data-theme="veritas"] .pg-pull,
+    .m-stage[data-theme="veritas"] .pg-pull { border-left-color: var(--ink); }
 
     /* ───── The book ───── */
     .book-wrap {
@@ -655,30 +663,158 @@
         rgba(40,25,10,0.55) 0%, rgba(40,25,10,0.12) 36%, transparent 62%);
     }
 
-    @media (max-width: 760px) {
-      /* Declutter: stage ornaments crowd the larger single page. */
-      .stage-ornament, .stage-corner, .stage-spine-mark { display: none !important; }
-
-      /* Top bar: keep the CTA on one line, tighten spacing. */
-      .topbar { padding: 12px 16px; gap: 12px; }
-      .topbar-brand { font-size: 16px; }
-      .topbar-cta {
-        white-space: nowrap; padding: 9px 12px;
-        font-size: 9px; letter-spacing: 0.16em; gap: 7px;
-      }
-
-      /* Progress rail → horizontal scrubber pinned above the footer. */
-      .progress {
-        right: auto; left: 50%; top: auto; bottom: 50px;
-        transform: translateX(-50%);
-        flex-direction: row; align-items: flex-end; gap: 11px;
-      }
-      .progress button { padding: 0 2px; justify-content: center; }
-      .progress .pip { width: 1px; height: 13px; }
-      .progress button:hover .pip { width: 1px; height: 18px; }
-      .progress button.active .pip { width: 1.5px; height: 21px; }
-      .progress .tip { display: none; }
+    /* ════════ MOBILE SECTIONED EXPERIENCE (portrait) ════════
+     * Portrait devices render <MobileExperience>: a full-screen hero
+     * (cover + manifest + CTA), a motion transition on scroll, then the
+     * single-page reader above. Desktop (.stage) is never rendered here. */
+    .m-stage {
+      position: sticky; top: 0; height: 100vh; width: 100%;
+      overflow: hidden; background: var(--stage-bg);
+      font-family: 'Manrope', sans-serif; color: var(--ink);
     }
+
+    /* ── Mobile top bar ── */
+    .m-topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 40;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 18px;
+      background: var(--stage-bg); border-bottom: 2px solid var(--ink);
+    }
+    .m-brand {
+      font-family: 'Cormorant Garamond', serif; font-weight: 500;
+      font-size: 21px; letter-spacing: 0.01em; color: var(--ink);
+    }
+    .m-brand em { color: var(--accent); font-style: italic; }
+    .m-burger {
+      position: relative; width: 40px; height: 32px; flex: 0 0 auto;
+      background: transparent; border: 1px solid var(--rule); cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    }
+    .m-burger span {
+      display: block; width: 18px; height: 1.5px; background: var(--ink);
+      transition: transform 0.28s, opacity 0.2s;
+    }
+    .m-burger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .m-burger.open span:nth-child(2) { opacity: 0; }
+    .m-burger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+    /* ── Chapter menu drawer ── */
+    .m-menu { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+    .m-menu.open { pointer-events: auto; }
+    .m-menu-scrim {
+      position: absolute; inset: 0; border: none; cursor: pointer;
+      background: rgba(8,10,18,0.42); opacity: 0; transition: opacity 0.3s;
+    }
+    .m-menu.open .m-menu-scrim { opacity: 1; }
+    .m-menu-panel {
+      position: absolute; top: 0; right: 0; height: 100%;
+      width: min(80vw, 320px);
+      background: var(--paper); border-left: 2px solid var(--ink);
+      box-shadow: -20px 0 50px -20px rgba(0,0,0,0.4);
+      transform: translateX(100%); transition: transform 0.34s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column;
+      padding: 18px 22px 22px;
+    }
+    .m-menu.open .m-menu-panel { transform: translateX(0); }
+    .m-menu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .m-menu-eyebrow {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.28em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .m-menu-x { background: none; border: none; font-size: 26px; line-height: 1; color: var(--ink); cursor: pointer; }
+    .m-menu-item {
+      display: flex; align-items: baseline; gap: 14px;
+      background: none; border: none; cursor: pointer; text-align: left;
+      padding: 13px 0; border-top: 1px solid var(--rule); width: 100%;
+      color: var(--ink); transition: color 0.2s;
+    }
+    .m-menu-item .mi-n {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; color: var(--ink-soft); min-width: 22px;
+    }
+    .m-menu-item .mi-t { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 500; }
+    .m-menu-item.active .mi-t { color: var(--accent); font-style: italic; }
+    .m-menu-item.active .mi-n { color: var(--accent); }
+    .m-menu-cta {
+      margin-top: 20px; text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      padding: 13px 16px; background: var(--ink); color: var(--paper);
+    }
+    .m-menu-cta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .m-menu-foot {
+      margin-top: auto; padding-top: 18px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.12em; color: var(--ink-soft);
+    }
+
+    /* ── Book reader layer ── */
+    .m-book-layer {
+      position: absolute; inset: 0; z-index: 10;
+      transform-origin: center center;
+      transition: none;
+    }
+
+    /* ── Horizontal chapter scrubber ── */
+    .m-scrubber {
+      position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%);
+      z-index: 25; display: flex; align-items: flex-end; gap: 12px;
+      transition: opacity 0.3s;
+    }
+    .m-scrubber button {
+      background: none; border: none; cursor: pointer; padding: 6px 1px;
+      display: flex; align-items: flex-end;
+    }
+    .m-scrubber .tick { width: 1px; height: 13px; background: var(--ink-soft); transition: height 0.3s, background 0.3s, width 0.3s; }
+    .m-scrubber button.active .tick { height: 22px; width: 1.5px; background: var(--accent); }
+
+    /* ── Hero section ── */
+    .m-hero {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 70px 26px 56px;
+      will-change: opacity, transform;
+    }
+    .m-hero-meta {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .m-hero-meta .ruler { width: 26px; height: 1px; background: var(--accent); opacity: 0.7; }
+    .m-hero-cover {
+      position: relative; overflow: hidden; flex: 0 0 auto;
+      border-radius: 3px;
+      box-shadow: 0 30px 64px -24px rgba(10,14,28,0.6), 0 8px 20px rgba(0,0,0,0.18);
+    }
+    .m-hero-cover .face { position: absolute; inset: 0; }
+    .m-hero-h {
+      margin: 26px 0 0; font-family: 'Cormorant Garamond', serif;
+      font-weight: 500; font-size: clamp(26px, 7vw, 38px); line-height: 1.12;
+      letter-spacing: -0.005em; color: var(--ink);
+    }
+    .m-hero-h em { color: var(--accent); font-style: italic; }
+    .m-hero-sub {
+      margin: 14px auto 0; max-width: 30ch;
+      font-size: 14px; line-height: 1.6; color: var(--ink-soft);
+    }
+    .m-hero-cta {
+      margin-top: 26px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      padding: 13px 22px; background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+    }
+    .m-hero-cta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .m-hero-cue {
+      position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.28em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .m-hero-arrow { animation: mBob 1.8s ease-in-out infinite; font-size: 13px; }
+    @keyframes mBob { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(4px); } }
+    @media (prefers-reduced-motion: reduce){ .m-hero-arrow { animation: none; } }
 
     @media (max-width: 600px) {
       /* Footer: drop the secondary group so the address never overflows. */

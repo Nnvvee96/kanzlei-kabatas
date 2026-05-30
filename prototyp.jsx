@@ -725,18 +725,17 @@ function Sheet({ index, progress, totalSheets, curlIntensity, frontFace, backCon
 // On narrow screens the two-page spread is unreadable (each page would be
 // ~150px wide). Instead we show ONE page at a time, near full-width, and
 // turn pages with a 3D leaf-flip driven by the same scroll progress.
-// Desktop is untouched — this component is only rendered when isNarrow.
-function MobileBook({ progress, pages, viewport }) {
+// Desktop is untouched — this component is only rendered when isMobile.
+function MobileBook({ fpos, pages, viewport }) {
   const RATIO = 680 / 490; // reference page aspect (h/w)
   const availW = viewport.w - 28;          // 14px side margins
-  const availH = viewport.h - 150;         // room for nav + footer + rail
+  const availH = viewport.h - 168;         // room for nav + footer + scrubber
   let pageW = Math.min(availW, availH / RATIO);
   pageW = Math.max(pageW, 240);
   const pageH = pageW * RATIO;
   const scale = pageH / 680;
 
   const N = pages.length;
-  const fpos = clamp((progress / FLIP_COUNT) * (N - 1), 0, N - 1);
   const cur = clamp(Math.floor(fpos), 0, N - 2);
   const frac = clamp(fpos - cur, 0, 1);
   const eased = easeInOut(frac);
@@ -769,6 +768,135 @@ function MobileBook({ progress, pages, viewport }) {
   );
 }
 
+// Page index of each chapter's title page in the mobile reading order
+// (Cover=0, then [title, body] per chapter, BackCover last).
+const chapterTitlePage = (i) => 1 + i * 2;
+// Chapter index from a page float (cover & back cover → nearest chapter).
+function chapterFromPage(fpos) {
+  const p = Math.round(fpos);
+  if (p <= 0) return -1;                 // cover
+  if (p >= 1 + CHAPTERS.length * 2) return CHAPTERS.length - 1;
+  return clamp(Math.floor((p - 1) / 2), 0, CHAPTERS.length - 1);
+}
+
+// ───── MOBILE TOP BAR (brand + hamburger) ─────────────────────────
+function MobileTopBar({ onMenu, menuOpen }) {
+  return (
+    <div className="m-topbar">
+      <div className="m-brand">Kaan <em>Kabataş</em></div>
+      <button className={'m-burger' + (menuOpen ? ' open' : '')} aria-label="Kapitel"
+        onClick={onMenu}>
+        <span /><span /><span />
+      </button>
+    </div>
+  );
+}
+
+// ───── MOBILE CHAPTER MENU (overlay drawer) ───────────────────────
+function MobileMenu({ open, onClose, onJump, activeChapter }) {
+  return (
+    <div className={'m-menu' + (open ? ' open' : '')} aria-hidden={!open}>
+      <button className="m-menu-scrim" aria-label="Schließen" onClick={onClose} />
+      <nav className="m-menu-panel">
+        <div className="m-menu-head">
+          <span className="m-menu-eyebrow">Liber Iuris · MMXXVI</span>
+          <button className="m-menu-x" aria-label="Schließen" onClick={onClose}>×</button>
+        </div>
+        <button className={'m-menu-item' + (activeChapter === -1 ? ' active' : '')}
+          onClick={() => onJump(0)}>
+          <span className="mi-n">—</span><span className="mi-t">Einband</span>
+        </button>
+        {CHAPTERS.map((c, i) => (
+          <button key={c.key} className={'m-menu-item' + (activeChapter === i ? ' active' : '')}
+            onClick={() => onJump(chapterTitlePage(i))}>
+            <span className="mi-n">{c.n}</span><span className="mi-t">{c.title}</span>
+          </button>
+        ))}
+        <a className="m-menu-cta" href="#" onClick={(e) => { e.preventDefault(); onJump(chapterTitlePage(5)); }}>
+          <span className="dot" />Termin buchen
+        </a>
+        <div className="m-menu-foot">Bürgermeister-Smidt-Str. 24 · Bremerhaven</div>
+      </nav>
+    </div>
+  );
+}
+
+// ───── MOBILE CHAPTER SCRUBBER (horizontal, bottom) ───────────────
+function MobileScrubber({ activeChapter, onJump, opacity }) {
+  const items = [{ key: 'cover', n: -1, target: 0 },
+    ...CHAPTERS.map((c, i) => ({ key: c.key, n: i, target: chapterTitlePage(i) }))];
+  return (
+    <div className="m-scrubber" style={{ opacity }}>
+      {items.map((it) => {
+        const active = it.n === activeChapter || (it.n === -1 && activeChapter === -1);
+        return (
+          <button key={it.key} className={active ? 'active' : ''}
+            aria-label={it.n === -1 ? 'Einband' : CHAPTERS[it.n].title}
+            onClick={() => onJump(it.target)}>
+            <span className="tick" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ───── MOBILE EXPERIENCE (hero section → book reader) ──────────────
+// Portrait devices get a sectioned experience instead of the desktop
+// two-page spread: a full-screen hero (cover + manifest + CTA), a motion
+// transition on scroll, then a full-width single-page reader.
+function MobileExperience({ scroll01, pages, viewport, heroScroll, pageScroll, U, jumpToPage, theme }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const u = scroll01 * U;
+
+  const heroT = easeInOut(clamp(u / heroScroll, 0, 1));   // 0 → 1 as hero leaves
+  const fpos = clamp((u - heroScroll) / pageScroll, 0, pages.length - 1);
+
+  const heroOpacity = clamp(1 - heroT * 1.1, 0, 1);
+  const heroShift = -heroT * 46;                          // px, hero drifts up
+  const bookOpacity = clamp((heroT - 0.18) / 0.6, 0, 1);  // fades in mid-transition
+  const bookScale = lerp(0.93, 1, clamp(heroT, 0, 1));
+
+  const activeChapter = chapterFromPage(fpos);
+
+  // Hero cover sizing (decorative, smaller than the reader page)
+  const RATIO = 680 / 490;
+  const heroCoverH = Math.min(viewport.h * 0.34, 300);
+  const heroCoverW = heroCoverH / RATIO;
+
+  return (
+    <div className="m-stage" data-theme={theme}>
+      <MobileTopBar onMenu={() => setMenuOpen((v) => !v)} menuOpen={menuOpen} />
+      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)}
+        activeChapter={activeChapter}
+        onJump={(pg) => { setMenuOpen(false); jumpToPage(pg); }} />
+
+      {/* Book reader layer (revealed as the hero leaves) */}
+      <div className="m-book-layer" style={{ opacity: bookOpacity, transform: `scale(${bookScale})` }}>
+        <MobileBook fpos={fpos} pages={pages} viewport={viewport} />
+      </div>
+
+      <MobileScrubber activeChapter={activeChapter} onJump={jumpToPage} opacity={bookOpacity} />
+
+      {/* Hero layer (on top, fades out first) */}
+      {heroOpacity > 0.02 && (
+        <div className="m-hero" style={{ opacity: heroOpacity, transform: `translateY(${heroShift}px)` }}>
+          <div className="m-hero-meta"><span className="ruler" />Liber Iuris · MMXXVI</div>
+          <div className="m-hero-cover" style={{ width: `${heroCoverW}px`, height: `${heroCoverH}px`, '--page-scale': heroCoverH / 680 }}>
+            <CoverFace />
+          </div>
+          <h1 className="m-hero-h">Recht ist <em>Würde,</em><br />in Form gebracht.</h1>
+          <p className="m-hero-sub">Eine Kanzlei für alles, was Ihnen im Recht begegnet — modern, persönlich, in Bremerhaven.</p>
+          <button className="m-hero-cta" onClick={() => jumpToPage(chapterTitlePage(5))}>
+            <span className="dot" />Termin buchen
+          </button>
+          <div className="m-hero-cue"><span>Aufschlagen</span><span className="m-hero-arrow">↓</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ───── APP ────────────────────────────────────────────────────────
 function App() {
   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -782,6 +910,7 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   const [progress, setProgress] = useState(0);
+  const [scroll01, setScroll01] = useState(0);   // normalized scroll 0..1 (drives mobile)
   const [viewport, setViewport] = useState({ w: 1280, h: 800 });
   const driverRef = useRef(null);
 
@@ -795,6 +924,7 @@ function App() {
       const scrolled = clamp(-rect.top, 0, total);
       const p = (scrolled / total) * FLIP_COUNT;
       setProgress(p);
+      setScroll01(total > 0 ? scrolled / total : 0);
     };
     const onResize = () => {
       setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -809,13 +939,16 @@ function App() {
     };
   }, []);
 
-  const jumpTo = useCallback((targetProgress) => {
+  const scrollToFrac = useCallback((frac01) => {
     const driver = driverRef.current;
     if (!driver) return;
     const total = driver.offsetHeight - window.innerHeight;
-    const targetScroll = (targetProgress / FLIP_COUNT) * total + driver.offsetTop;
-    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    window.scrollTo({ top: clamp(frac01, 0, 1) * total + driver.offsetTop, behavior: 'smooth' });
   }, []);
+  // Desktop chapter jump (progress-based).
+  const jumpTo = useCallback((targetProgress) => {
+    scrollToFrac(targetProgress / FLIP_COUNT);
+  }, [scrollToFrac]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -853,6 +986,18 @@ function App() {
   const mobilePages = [];
   sheetContents.forEach((sc) => { mobilePages.push(sc.front); mobilePages.push(sc.back); });
 
+  // ─── Mobile vs desktop ───
+  // Portrait devices (and anything narrow) get the sectioned single-page
+  // experience; wide landscape keeps the desktop two-page spread.
+  const isMobile = viewport.w <= 760 || viewport.h >= viewport.w;
+  const M_HERO = 1.0;            // scroll units spent on the hero + transition
+  const M_PAGE = 0.72;           // scroll units per page turn
+  const M_U = M_HERO + (mobilePages.length - 1) * M_PAGE;   // total mobile scroll units
+  // Jump straight to a page in the mobile reader (used by menu / scrubber / CTA).
+  const jumpToPage = useCallback((pageIdx) => {
+    scrollToFrac((M_HERO + pageIdx * M_PAGE) / M_U);
+  }, [scrollToFrac, M_U]);
+
   // ─── Layout math ───
   // Book geometry is responsive: bookH clamps to viewport height so the
   // book always fits with room for the nav (~75px) and bottom hint (~50px).
@@ -874,7 +1019,6 @@ function App() {
   // viewport, leaving the left half clear for the intro plate.
   // Cover center horizontally = bookCenter + pageW/2 (since spine = bookCenter).
   const isWide = viewport.w > 940;
-  const isNarrow = viewport.w <= 760;   // mobile single-page reading mode
   const closedCoverCenter = viewport.w * (isWide ? 0.68 : 0.58);
   const closedBookCenter = closedCoverCenter - pageW / 2;
   const openBookCenter = viewport.w / 2;
@@ -889,7 +1033,13 @@ function App() {
   const showIntro = t.showIntro && isWide && introWidth > 220;
 
   return (
-    <div ref={driverRef} id="scroll-driver" style={{ height: `${100 + FLIP_COUNT * 100}vh` }}>
+    <div ref={driverRef} id="scroll-driver"
+      style={{ height: isMobile ? `${(M_U + 1) * 100}vh` : `${100 + FLIP_COUNT * 100}vh` }}>
+      {isMobile ? (
+        <MobileExperience scroll01={scroll01} pages={mobilePages} viewport={viewport}
+          heroScroll={M_HERO} pageScroll={M_PAGE} U={M_U}
+          jumpToPage={jumpToPage} theme={t.theme} />
+      ) : (
       <div className="stage" data-theme={t.theme} data-book-open={progress > 0.25 ? 'true' : 'false'}>
         <TopNav activeChapter={activeChapter} jumpTo={jumpTo} />
 
@@ -924,9 +1074,6 @@ function App() {
 
         {showIntro && <IntroPlate visibility={introVisibility} x={introX} width={introWidth} />}
 
-        {isNarrow ? (
-          <MobileBook progress={progress} pages={mobilePages} viewport={viewport} />
-        ) : (
         <div className="book-wrap"
           style={{
             transform: `translate(${bookOffsetFromCenter}px, 0)`,
@@ -950,13 +1097,13 @@ function App() {
             <div className="spine-shadow" />
           </div>
         </div>
-        )}
 
         <ProgressRail progress={progress} jumpTo={jumpTo} visible={t.showProgress} />
 
         {/* Scroll-hint removed — the closed book is self-evident, and the
             footer strip already anchors the bottom. */}
       </div>
+      )}
 
       <TweaksPanel title="Tweaks">
         <TweakSection label="Materialität">
